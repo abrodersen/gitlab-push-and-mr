@@ -79,6 +79,9 @@ pub async fn fetch_projects(
     let mut result: Vec<ProjectResponse> = Vec::new();
     for p in projects_raw {
         let mut data: Vec<ProjectResponse> = serde_json::from_slice(&p)?;
+        for pj in data.iter() {
+            debug!("found project {}", pj.name);
+        }
         result.append(&mut data);
     }
     Ok(result)
@@ -92,22 +95,11 @@ async fn fetch(
 ) -> Result<Vec<Bytes>> {
     let https = HttpsConnector::new();
     let client = Client::builder().build::<_, hyper::Body>(https);
-    let group = config.group.as_ref();
-    let user = config.user.as_ref();
     let host = config.host.as_ref();
-    let uri = match group {
-        Some(v) => format!(
-            "{}/api/v4/groups/{}/{}?per_page={}",
-            host.unwrap_or(&"https://gitlab.com".to_string()), v, domain, per_page
-        ),
-        None => match user {
-            Some(u) => format!(
-                "{}/api/v4/users/{}/{}?per_page={}",
-                host.unwrap_or(&"https://gitlab.com".to_string()), u, domain, per_page
-            ),
-            None => "invalid url".to_string(),
-        },
-    };
+    let uri = format!(
+        "{}/api/v4/{}?per_page={}",
+        host.unwrap_or(&"https://gitlab.com".to_string()), domain, per_page
+    );
     let req = Request::builder()
         .uri(uri)
         .header("PRIVATE-TOKEN", access_token.to_owned())
@@ -153,14 +145,10 @@ async fn fetch_paged(
     page: i32,
 ) -> Result<Bytes> {
     let host = config.host.as_ref();
-    let group = match config.group.as_ref() {
-        Some(v) => v,
-        None => return Err(HttpError::ConfigError())
-    };
     let req = Request::builder()
         .uri(format!(
-            "{}/api/v4/groups/{}/{}?per_page=20&page={}",
-            host.unwrap_or(&"https://gitlab.com".to_string()), group, domain, page
+            "{}/api/v4/{}?per_page=20&page={}",
+            host.unwrap_or(&"https://gitlab.com".to_string()), domain, page
         ))
         .header("PRIVATE-TOKEN", access_token)
         .body(Body::empty())?;

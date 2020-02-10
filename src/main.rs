@@ -6,6 +6,8 @@ extern crate clap;
 extern crate serde;
 extern crate serde_json;
 extern crate toml;
+#[macro_use]
+extern crate log;
 
 use clap::{App, Arg};
 use data::{Config, MRRequest, ProjectResponse};
@@ -35,12 +37,15 @@ fn git_credentials_ssh_callback(
     }
     let config = get_config().expect("Could not read config");
     let key_file = &config.ssh_key_file.unwrap();
-    let passphrase = &config.ssh_passphrase.unwrap();
+    let passphrase = match &config.ssh_passphrase {
+        Some(s) => Some(s.as_str()),
+        None => None,
+    };
     git2::Cred::ssh_key(
         user,
         None,
         std::path::Path::new(&key_file),
-        Some(&passphrase),
+        passphrase,
     )
 }
 
@@ -129,6 +134,7 @@ fn create_mr(
         };
         let mut actual_project: Option<&ProjectResponse> = None;
         for p in &projects {
+            debug!("checking project {}", p.name);
             if p.ssh_url_to_repo == actual_remote {
                 actual_project = Some(p);
                 break;
@@ -156,6 +162,8 @@ fn create_mr(
 }
 
 fn main() -> Result<()> {
+    env_logger::init();
+
     let matches = App::new("Gitlab Push-and-MR")
         .version("1.1.0")
         .arg(
